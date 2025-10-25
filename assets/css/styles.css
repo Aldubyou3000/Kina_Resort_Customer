@@ -1405,6 +1405,45 @@ label {
   flex-direction: column;
   gap: 16px;
   scroll-behavior: smooth;
+  /* Ensure scroll wheel works */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Custom scrollbar for AI chat messages */
+.ai-chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ai-chat-messages::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.ai-chat-messages::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.ai-chat-messages::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Firefox scrollbar styling */
+.ai-chat-messages {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* Ensure scroll wheel works in all browsers */
+.ai-chat-messages {
+  /* Force hardware acceleration for smooth scrolling */
+  transform: translateZ(0);
+  /* Ensure the element can receive scroll events */
+  position: relative;
+  /* Make sure scroll events bubble properly */
+  touch-action: pan-y;
 }
 
 .message-group {

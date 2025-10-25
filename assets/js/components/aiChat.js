@@ -219,7 +219,7 @@ async function getAIResponse(userMessage) {
   }
   
   try {
-    console.log('Sending request to DeepSeek API...');
+    console.log('Sending request to OpenRouter API...');
     
     // Construct full messages array with system prompt and history
     const messages = [
@@ -305,6 +305,15 @@ function initializeAIChat() {
     chatPopup.addEventListener('click', function(e) {
       e.stopPropagation();
     });
+    
+    // Ensure scroll events work properly in the messages container
+    const messagesContainer = document.getElementById('ai-chat-messages');
+    if (messagesContainer) {
+      messagesContainer.addEventListener('wheel', function(e) {
+        // Allow normal scroll behavior
+        e.stopPropagation();
+      }, { passive: true });
+    }
   }
   
   // Close chat when clicking outside of it

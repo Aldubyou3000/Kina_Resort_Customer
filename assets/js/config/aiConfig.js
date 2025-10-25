@@ -7,16 +7,16 @@
 // TODO: Replace these values with your actual API configuration
 
 export const AI_CONFIG = {
-  // API Key - Replace with your actual API key
-  // Get your API key from: https://platform.deepseek.com/api_keys
-  API_KEY: 'your-deepseek-api-key-here',
+  // API Key - OpenRouter API key for GPT-4o-mini
+  // Get your API key from: https://openrouter.ai/keys
+  API_KEY: 'NO_API_KEY_SET', //tinanggal ko muna
   
-  // AI Model Version - Choose your preferred model
-  // Options: 'deepseek-chat', 'deepseek-reasoner'
-  MODEL: 'deepseek-chat',
+  // AI Model Version - GPT-4o-mini via OpenRouter
+  // Model: openai/gpt-4o-mini
+  MODEL: 'openai/gpt-4o-mini',
   
-  // API Endpoint - DeepSeek's API endpoint (OpenAI-compatible)
-  API_ENDPOINT: 'https://api.deepseek.com/v1/chat/completions',
+  // API Endpoint - OpenRouter's API endpoint (OpenAI-compatible)
+  API_ENDPOINT: 'https://openrouter.ai/api/v1/chat/completions',
   
   // System prompt for the AI assistant
   SYSTEM_PROMPT: `You are Kina Resort's AI assistant. You help guests with:
@@ -58,7 +58,7 @@ export const MOCK_RESPONSES = {
 // Check if API is properly configured
 export function isAPIConfigured() {
   const hasValidKey = AI_CONFIG.API_KEY && AI_CONFIG.API_KEY !== 'your-deepseek-api-key-here';
-  const hasValidEndpoint = AI_CONFIG.API_ENDPOINT && AI_CONFIG.API_ENDPOINT.includes('deepseek.com');
+  const hasValidEndpoint = AI_CONFIG.API_ENDPOINT && AI_CONFIG.API_ENDPOINT.includes('openrouter.ai');
   
   console.log('API Configuration Check:');
   console.log('- API_KEY:', AI_CONFIG.API_KEY ? 'Present' : 'Missing');
@@ -99,16 +99,18 @@ export function getMockResponse(userMessage) {
 SETUP INSTRUCTIONS:
 
 1. API KEY SETUP:
-   - Go to https://platform.deepseek.com/api_keys
-   - Sign up and create a new API key (free tier available)
-   - Replace 'your-deepseek-api-key-here' with your actual API key
+   - Go to https://openrouter.ai/keys
+   - Sign up and create a new API key
+   - Replace the API key above with your actual OpenRouter key
 
 2. MODEL SELECTION:
-   - 'deepseek-chat': Fast general chat model
-   - 'deepseek-reasoner': For more complex reasoning tasks
+   - 'openai/gpt-4o-mini': OpenAI's most advanced small model
+   - More than 60% cheaper than GPT-3.5 Turbo
+   - Supports both text and image inputs
 
 3. API ENDPOINT:
-   - Uses DeepSeek's official API, compatible with OpenAI format
+   - Uses OpenRouter's API, compatible with OpenAI format
+   - Routes requests to the best providers with fallbacks
 
 4. TESTING:
    - The system will use mock responses if API is not configured
