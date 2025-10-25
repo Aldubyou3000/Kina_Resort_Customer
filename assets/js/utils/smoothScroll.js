@@ -39,6 +39,9 @@ export function initSmoothScroll() {
 
   // Add Lenis classes to HTML element
   document.documentElement.classList.add('lenis', 'lenis-smooth');
+  
+  // Make Lenis instance globally accessible
+  window.lenisInstance = lenisInstance;
 
   return lenisInstance;
 }
@@ -50,6 +53,7 @@ export function destroySmoothScroll() {
   if (lenisInstance) {
     lenisInstance.destroy();
     lenisInstance = null;
+    window.lenisInstance = null;
     document.documentElement.classList.remove('lenis', 'lenis-smooth');
   }
 }

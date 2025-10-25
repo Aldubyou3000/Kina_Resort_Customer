@@ -7,10 +7,18 @@ let calendarState = {
   packageTitle: '',
   selectedCheckin: null,
   selectedCheckout: null,
-  selectionStep: 1 // 1 = selecting check-in, 2 = selecting check-out
+  selectionStep: 1, // 1 = selecting check-in, 2 = selecting check-out
+  modifyingDate: null, // 'checkin', 'checkout', or null for normal flow
+  undoStack: [] // Stack to track previous states for undo functionality
 };
 
 // Mock data for demonstration - in real app this would come from API
+// Availability patterns:
+// - Weekdays: Mostly available (good for testing)
+// - Weekends: Mostly booked (realistic demand)
+// - Holidays: Booked periods (Christmas week, summer peak)
+// - Maintenance: Random 5% of dates
+// - Most other dates: Available for testing
 const mockReservationData = {
   'Standard Room': 15,
   'Ocean View Room': 12,
@@ -38,23 +46,52 @@ function getMockDateStatus(date, packageTitle) {
     return 'today';
   }
   
-  // Create deterministic "random" based on date and package
-  const dateString = date.toISOString().split('T')[0];
-  const seed = dateString.split('-').join('') + packageTitle.length;
-  const deterministicRandom = (parseInt(seed) % 100) / 100;
+  // Specific unavailable dates for realistic testing scenarios
+  const unavailableDates = [
+    // Weekend bookings (Fridays and Saturdays)
+    (date) => {
+      const dayOfWeek = date.getDay();
+      return dayOfWeek === 5 || dayOfWeek === 6; // Friday = 5, Saturday = 6
+    },
+    // Holiday periods (example: Christmas week)
+    (date) => {
+      const month = date.getMonth();
+      const day = date.getDate();
+      return month === 11 && day >= 20 && day <= 27; // Dec 20-27
+    },
+    // Summer peak season (example: July 15-31)
+    (date) => {
+      const month = date.getMonth();
+      const day = date.getDate();
+      return month === 6 && day >= 15; // July 15-31
+    },
+    // Random maintenance days (1-2 days per month)
+    (date) => {
+      const dateString = date.toISOString().split('T')[0];
+      const seed = dateString.split('-').join('') + packageTitle.length;
+      const deterministicRandom = (parseInt(seed) % 100) / 100;
+      return deterministicRandom < 0.05; // 5% chance for maintenance
+    }
+  ];
   
-  const reservationCount = mockReservationData[packageTitle] || 10;
-  
-  // Higher chance of booked dates for packages with more reservations
-  const bookedThreshold = 0.3 + (reservationCount / 100);
-  
-  if (deterministicRandom < 0.1) {
-    return 'maintenance';
-  } else if (deterministicRandom < bookedThreshold) {
-    return 'booked';
-  } else {
-    return 'available';
+  // Check if date matches any unavailable pattern
+  for (const checkUnavailable of unavailableDates) {
+    if (checkUnavailable(date)) {
+      // Determine if it's maintenance or booked
+      const dateString = date.toISOString().split('T')[0];
+      const seed = dateString.split('-').join('') + packageTitle.length;
+      const deterministicRandom = (parseInt(seed) % 100) / 100;
+      
+      if (deterministicRandom < 0.3) {
+        return 'maintenance';
+      } else {
+        return 'booked';
+      }
+    }
   }
+  
+  // Most other dates are available for testing
+  return 'available';
 }
 
 // Generate calendar HTML for a given month/year
@@ -168,11 +205,31 @@ function generateCalendarHTML(year, month, packageTitle) {
   
   calendarHTML += '</div>';
   
-  // Add reset button if dates are being selected
-  if (calendarState.selectedCheckin || calendarState.selectedCheckout) {
+  // Add action buttons
+  const hasUndoActions = calendarState.undoStack.length > 0;
+  const hasBothDates = calendarState.selectedCheckin && calendarState.selectedCheckout;
+  const isModifyingSingleDate = calendarState.modifyingDate && (calendarState.selectedCheckin || calendarState.selectedCheckout);
+  
+  if (hasUndoActions || hasBothDates || isModifyingSingleDate) {
     calendarHTML += `
       <div class="calendar-actions">
-        <button class="calendar-reset-btn" onclick="resetDateSelection()">Reset Selection</button>
+        ${hasUndoActions ? 
+          `<button class="calendar-undo-btn" onclick="undoLastSelection()" title="Undo last selection">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 7v6h6"/>
+              <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+            </svg>
+            Undo
+          </button>` : ''
+        }
+        ${(hasBothDates || isModifyingSingleDate) ? 
+          `<button class="calendar-confirm-btn" onclick="confirmDateSelection()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20,6 9,17 4,12"/>
+            </svg>
+            Confirm Selection
+          </button>` : ''
+        }
       </div>
     `;
   }
@@ -182,6 +239,16 @@ function generateCalendarHTML(year, month, packageTitle) {
 
 // Get selection instruction based on package type and current state
 function getSelectionInstruction() {
+  // Check if we're modifying a specific date from booking modal
+  if (calendarState.modifyingDate) {
+    if (calendarState.modifyingDate === 'checkin') {
+      return 'Click a date to select your check-in date';
+    } else if (calendarState.modifyingDate === 'checkout') {
+      return 'Click a date after check-in to select your check-out date';
+    }
+  }
+  
+  // Normal flow for standalone calendar
   if (calendarState.packageCategory === 'rooms') {
     if (calendarState.selectionStep === 1) {
       return 'Click a date to select check-in date';
@@ -221,6 +288,33 @@ function handleDateClick(dateString, status) {
   const clickedDate = new Date(dateString);
   clickedDate.setHours(0, 0, 0, 0); // Normalize to start of day
   
+  // Save current state before making changes (for undo functionality)
+  saveStateForUndo();
+  
+  // Check if we're modifying a specific date from booking modal
+  if (calendarState.modifyingDate) {
+    if (calendarState.modifyingDate === 'checkin') {
+      calendarState.selectedCheckin = new Date(clickedDate);
+      // If checkout exists and is before new checkin, clear it
+      if (calendarState.selectedCheckout && clickedDate >= calendarState.selectedCheckout) {
+        calendarState.selectedCheckout = null;
+      }
+    } else if (calendarState.modifyingDate === 'checkout') {
+      // Check if checkout is after checkin
+      if (calendarState.selectedCheckin && clickedDate <= calendarState.selectedCheckin) {
+        alert('Check-out date must be after check-in date');
+        return;
+      }
+      calendarState.selectedCheckout = new Date(clickedDate);
+    }
+    
+    updateCalendarDisplay();
+    
+    // Don't auto-close - let user confirm with button
+    return;
+  }
+  
+  // Normal flow for standalone calendar
   if (calendarState.packageCategory === 'rooms') {
     if (calendarState.selectionStep === 1) {
       // First click - select check-in
@@ -232,14 +326,7 @@ function handleDateClick(dateString, status) {
       if (clickedDate > calendarState.selectedCheckin) {
         calendarState.selectedCheckout = new Date(clickedDate);
         updateCalendarDisplay();
-        // Show confirmation after a brief delay to show the selection
-        setTimeout(() => {
-          if (confirm(`Confirm your stay from ${calendarState.selectedCheckin.toLocaleDateString()} to ${calendarState.selectedCheckout.toLocaleDateString()}?`)) {
-            openBookingWithDates();
-          } else {
-            resetDateSelection();
-          }
-        }, 100);
+        // No automatic confirmation - user will click Confirm button when ready
       } else {
         alert('Check-out date must be after check-in date');
       }
@@ -260,11 +347,69 @@ function handleDateClick(dateString, status) {
   }
 }
 
+// Save current state to undo stack
+function saveStateForUndo() {
+  const stateSnapshot = {
+    selectedCheckin: calendarState.selectedCheckin ? new Date(calendarState.selectedCheckin) : null,
+    selectedCheckout: calendarState.selectedCheckout ? new Date(calendarState.selectedCheckout) : null,
+    selectionStep: calendarState.selectionStep,
+    modifyingDate: calendarState.modifyingDate
+  };
+  
+  // Only save if state actually changed
+  const lastState = calendarState.undoStack[calendarState.undoStack.length - 1];
+  if (!lastState || 
+      lastState.selectedCheckin?.getTime() !== stateSnapshot.selectedCheckin?.getTime() ||
+      lastState.selectedCheckout?.getTime() !== stateSnapshot.selectedCheckout?.getTime() ||
+      lastState.selectionStep !== stateSnapshot.selectionStep ||
+      lastState.modifyingDate !== stateSnapshot.modifyingDate) {
+    calendarState.undoStack.push(stateSnapshot);
+    
+    // Limit undo stack to prevent memory issues
+    if (calendarState.undoStack.length > 10) {
+      calendarState.undoStack.shift();
+    }
+  }
+}
+
+// Undo last date selection
+function undoLastSelection() {
+  if (calendarState.undoStack.length === 0) {
+    return; // Nothing to undo
+  }
+  
+  const previousState = calendarState.undoStack.pop();
+  
+  calendarState.selectedCheckin = previousState.selectedCheckin;
+  calendarState.selectedCheckout = previousState.selectedCheckout;
+  calendarState.selectionStep = previousState.selectionStep;
+  calendarState.modifyingDate = previousState.modifyingDate;
+  
+  updateCalendarDisplay();
+}
+
+// Confirm date selection and proceed with booking
+function confirmDateSelection() {
+  if (!calendarState.selectedCheckin || !calendarState.selectedCheckout) {
+    return; // Safety check
+  }
+  
+  // If we're modifying dates from booking modal, update the booking modal directly
+  if (calendarState.modifyingDate) {
+    openBookingWithDates();
+  } else {
+    // Normal flow - proceed with booking
+    openBookingWithDates();
+  }
+}
+
 // Reset date selection
 function resetDateSelection() {
   calendarState.selectedCheckin = null;
   calendarState.selectedCheckout = null;
   calendarState.selectionStep = 1;
+  calendarState.modifyingDate = null;
+  calendarState.undoStack = []; // Clear undo stack on reset
   updateCalendarDisplay();
 }
 
@@ -326,9 +471,20 @@ function openBookingWithDates() {
   // Close calendar modal
   closeCalendarModal();
   
-  // Open booking modal with pre-filled dates
-  if (window.openBookingModal) {
-    window.openBookingModal(reservationType, calendarState.packageTitle, preFillDates);
+  // Check if we're coming from booking modal
+  if (window.bookingModalCalendarMode) {
+    // Update the booking modal dates directly
+    if (window.updateBookingDates && preFillDates.checkin && preFillDates.checkout) {
+      window.updateBookingDates(preFillDates.checkin, preFillDates.checkout);
+    }
+    // Clear the calendar mode
+    window.bookingModalCalendarMode = null;
+    window.bookingModalCurrentDates = null;
+  } else {
+    // Open booking modal with pre-filled dates
+    if (window.openBookingModal) {
+      window.openBookingModal(reservationType, calendarState.packageTitle, preFillDates);
+    }
   }
 }
 
@@ -340,9 +496,37 @@ export function openCalendarModal(packageTitle, reservationCount, packageCategor
   // Initialize calendar state
   calendarState.packageCategory = packageCategory;
   calendarState.packageTitle = packageTitle;
-  calendarState.selectedCheckin = null;
-  calendarState.selectedCheckout = null;
-  calendarState.selectionStep = 1;
+  
+  // Check if we're coming from booking modal with existing dates
+  if (window.bookingModalCalendarMode && window.bookingModalCurrentDates) {
+    // Set which date we're modifying
+    calendarState.modifyingDate = window.bookingModalCalendarMode;
+    
+    // Only pre-populate if dates are actually selected (not null or empty)
+    const hasCheckin = window.bookingModalCurrentDates.checkin !== null && window.bookingModalCurrentDates.checkin !== '';
+    const hasCheckout = window.bookingModalCurrentDates.checkout !== null && window.bookingModalCurrentDates.checkout !== '';
+    
+    if (hasCheckin) {
+      calendarState.selectedCheckin = new Date(window.bookingModalCurrentDates.checkin);
+    }
+    if (hasCheckout) {
+      calendarState.selectedCheckout = new Date(window.bookingModalCurrentDates.checkout);
+    }
+    
+    // Set selection step based on what dates are available
+    if (hasCheckin && hasCheckout) {
+      calendarState.selectionStep = 2; // Both dates selected
+    } else if (hasCheckin) {
+      calendarState.selectionStep = 2; // Check-in selected, ready for check-out
+    } else {
+      calendarState.selectionStep = 1; // Start fresh
+    }
+  } else {
+    calendarState.selectedCheckin = null;
+    calendarState.selectedCheckout = null;
+    calendarState.selectionStep = 1;
+    calendarState.modifyingDate = null;
+  }
   
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -402,12 +586,44 @@ export function openCalendarModal(packageTitle, reservationCount, packageCategor
   document.body.style.overflow = 'hidden';
   document.body.classList.add('modal-open');
   
+  // Disable Lenis smooth scrolling when modal is open
+  const lenisInstance = window.lenisInstance || document.querySelector('.lenis')?.lenis;
+  if (lenisInstance) {
+    lenisInstance.stop();
+  }
+  
   // Add click outside to close
   currentModal.addEventListener('click', (e) => {
     if (e.target === currentModal) {
       closeCalendarModal();
     }
   });
+  
+  // Prevent scroll events from bubbling to background
+  currentModal.addEventListener('wheel', (e) => {
+    e.stopPropagation();
+  }, { passive: false });
+  
+  // Prevent middle mouse scroll from affecting background
+  currentModal.addEventListener('mousedown', (e) => {
+    if (e.button === 1) { // Middle mouse button
+      e.preventDefault();
+    }
+  });
+  
+  // Additional scroll prevention for the modal content
+  const modalContent = currentModal.querySelector('.calendar-modal');
+  if (modalContent) {
+    modalContent.addEventListener('wheel', (e) => {
+      e.stopPropagation();
+    }, { passive: false });
+    
+    modalContent.addEventListener('mousedown', (e) => {
+      if (e.button === 1) { // Middle mouse button
+        e.preventDefault();
+      }
+    });
+  }
   
   // Add escape key to close
   document.addEventListener('keydown', handleEscapeKey);
@@ -426,6 +642,12 @@ export function closeCalendarModal() {
     // Restore background scrolling
     document.body.style.overflow = '';
     document.body.classList.remove('modal-open');
+    
+    // Re-enable Lenis smooth scrolling when modal is closed
+    const lenisInstance = window.lenisInstance || document.querySelector('.lenis')?.lenis;
+    if (lenisInstance) {
+      lenisInstance.start();
+    }
     
     setTimeout(() => {
       if (currentModal && currentModal.parentNode) {
@@ -545,6 +767,8 @@ window.closeCalendarModal = closeCalendarModal;
 window.openCalendarModal = openCalendarModal;
 window.handleDateClick = handleDateClick;
 window.resetDateSelection = resetDateSelection;
+window.undoLastSelection = undoLastSelection;
+window.confirmDateSelection = confirmDateSelection;
 window.navigateMonth = navigateMonth;
 window.changeMonth = changeMonth;
 window.changeYear = changeYear;
