@@ -148,10 +148,6 @@ export function openBookingModal(initialType = 'room', packageTitle = '', preFil
   document.body.insertAdjacentHTML('beforeend', modalHTML);
   currentBookingModal = document.getElementById('booking-modal-overlay');
   
-  // Prevent background scrolling
-  document.body.style.overflow = 'hidden';
-  document.body.classList.add('modal-open');
-  
   // Add event listeners
   currentBookingModal.addEventListener('click', (e) => {
     if (e.target === currentBookingModal) {
@@ -159,10 +155,27 @@ export function openBookingModal(initialType = 'room', packageTitle = '', preFil
     }
   });
   
+  // Prevent background scrolling when modal is open
+  document.body.style.overflow = 'hidden';
+  document.body.classList.add('modal-open');
+  
+  // Disable Lenis smooth scrolling when modal is open
+  const lenisInstance = window.lenisInstance || document.querySelector('.lenis')?.lenis;
+  if (lenisInstance) {
+    lenisInstance.stop();
+  }
+  
   // Prevent scroll events from bubbling to background
   currentBookingModal.addEventListener('wheel', (e) => {
     e.stopPropagation();
   }, { passive: false });
+  
+  // Prevent middle mouse scroll from affecting background
+  currentBookingModal.addEventListener('mousedown', (e) => {
+    if (e.button === 1) { // Middle mouse button
+      e.preventDefault();
+    }
+  });
   
   document.addEventListener('keydown', handleEscapeKey);
   
@@ -183,6 +196,12 @@ export function closeBookingModal() {
     // Restore background scrolling
     document.body.style.overflow = '';
     document.body.classList.remove('modal-open');
+    
+    // Re-enable Lenis smooth scrolling when modal is closed
+    const lenisInstance = window.lenisInstance || document.querySelector('.lenis')?.lenis;
+    if (lenisInstance) {
+      lenisInstance.start();
+    }
     
     setTimeout(() => {
       if (currentBookingModal && currentBookingModal.parentNode) {
@@ -258,13 +277,23 @@ function renderRoomFields() {
       <div class="date-time-group">
         <div class="form-field">
           <label for="checkin-date" class="form-label">Check-in Date *</label>
-          <input type="date" id="checkin-date" name="checkinDate" class="form-input" required>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="date" id="checkin-date" name="checkinDate" class="form-input" required style="flex: 1;" onclick="openCalendarForCheckin()" readonly>
+            <button type="button" class="calendar-icon-btn" onclick="openCalendarForCheckin()" title="Select from calendar">
+              📅
+            </button>
+          </div>
           <div class="form-error" id="checkin-date-error"></div>
         </div>
         
         <div class="form-field">
           <label for="checkout-date" class="form-label">Check-out Date *</label>
-          <input type="date" id="checkout-date" name="checkoutDate" class="form-input" required>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="date" id="checkout-date" name="checkoutDate" class="form-input" required style="flex: 1;" onclick="openCalendarForCheckout()" readonly>
+            <button type="button" class="calendar-icon-btn" onclick="openCalendarForCheckout()" title="Select from calendar">
+              📅
+            </button>
+          </div>
           <div class="form-error" id="checkout-date-error"></div>
         </div>
       </div>
@@ -854,6 +883,83 @@ function validateForm() {
   return isValid;
 }
 
+// Save booking to localStorage
+function saveBookingToLocalStorage(bookingData) {
+  // Get current user from auth state
+  const authState = window.getAuthState ? window.getAuthState() : null;
+  if (!authState || !authState.isLoggedIn) {
+    console.error('User not logged in - cannot save booking');
+    return null;
+  }
+
+  const userEmail = authState.user?.email || 'unknown';
+  const storageKey = `kina_bookings_${userEmail}`;
+  const existingBookings = JSON.parse(localStorage.getItem(storageKey) || '[]');
+  
+  // Create booking record
+  const newBooking = {
+    id: 'BK' + Date.now(),
+    packageName: getPackageName(bookingData),
+    packageType: bookingData.reservationType,
+    checkIn: getCheckInDate(bookingData),
+    checkOut: getCheckOutDate(bookingData),
+    guests: getTotalGuests(bookingData),
+    status: 'Confirmed',
+    createdAt: new Date().toISOString(),
+    bookingData: bookingData // Store full booking data for details
+  };
+  
+  existingBookings.push(newBooking);
+  localStorage.setItem(storageKey, JSON.stringify(existingBookings));
+  
+  return newBooking;
+}
+
+// Helper functions to extract booking information
+function getPackageName(bookingData) {
+  if (bookingData.reservationType === 'room') {
+    return bookingData.selections.rooms.join(', ') || 'Room Booking';
+  } else if (bookingData.reservationType === 'cottage') {
+    return bookingData.selections.cottages.join(', ') || 'Cottage Booking';
+  } else if (bookingData.reservationType === 'function-hall') {
+    return bookingData.selections.hall || 'Function Hall Booking';
+  }
+  return 'Booking';
+}
+
+function getCheckInDate(bookingData) {
+  if (bookingData.reservationType === 'room') {
+    return bookingData.dates.checkin;
+  } else if (bookingData.reservationType === 'cottage') {
+    return bookingData.dates.date;
+  } else if (bookingData.reservationType === 'function-hall') {
+    return bookingData.dates.eventDate;
+  }
+  return new Date().toISOString().split('T')[0];
+}
+
+function getCheckOutDate(bookingData) {
+  if (bookingData.reservationType === 'room') {
+    return bookingData.dates.checkout;
+  } else if (bookingData.reservationType === 'cottage') {
+    return bookingData.dates.date; // Same day for cottage
+  } else if (bookingData.reservationType === 'function-hall') {
+    return bookingData.dates.eventDate; // Same day for function hall
+  }
+  return new Date().toISOString().split('T')[0];
+}
+
+function getTotalGuests(bookingData) {
+  if (bookingData.reservationType === 'room') {
+    return parseInt(bookingData.guests.adults) + parseInt(bookingData.guests.children);
+  } else if (bookingData.reservationType === 'cottage') {
+    return parseInt(bookingData.guests.adults) + parseInt(bookingData.guests.children);
+  } else if (bookingData.reservationType === 'function-hall') {
+    return parseInt(bookingData.guests.total);
+  }
+  return 1;
+}
+
 // Submit booking form
 function submitBooking(event) {
   event.preventDefault();
@@ -933,15 +1039,22 @@ function submitBooking(event) {
     };
   }
   
-  // Log booking data (mock submission)
-  console.log('Booking Submission:', bookingData);
+  // Save booking to localStorage
+  const savedBooking = saveBookingToLocalStorage(bookingData);
   
-  // Show success message
-  showBookingSuccess(bookingData);
+  if (savedBooking) {
+    console.log('Booking saved successfully:', savedBooking);
+    // Show success message
+    showBookingSuccess(bookingData, savedBooking);
+  } else {
+    console.error('Failed to save booking - user not logged in');
+    alert('Please log in to complete your booking.');
+    return;
+  }
 }
 
 // Show booking success
-function showBookingSuccess(bookingData) {
+function showBookingSuccess(bookingData, savedBooking) {
   const successHTML = `
     <div class="booking-success-modal">
       <div class="success-content">
@@ -952,10 +1065,13 @@ function showBookingSuccess(bookingData) {
           </svg>
         </div>
         <h3>Booking Submitted Successfully!</h3>
-        <p>Thank you for choosing Kina Resort. We'll contact you shortly to confirm your reservation.</p>
+        <p>Thank you for choosing Kina Resort. Your booking has been confirmed!</p>
         
         <div class="booking-summary">
-          <h4>Booking Summary:</h4>
+          <h4>Booking Details:</h4>
+          <div class="summary-item">
+            <strong>Booking ID:</strong> ${savedBooking.id}
+          </div>
           <div class="summary-item">
             <strong>Type:</strong> ${bookingData.reservationType.charAt(0).toUpperCase() + bookingData.reservationType.slice(1)} Reservation
           </div>
@@ -983,7 +1099,10 @@ function showBookingSuccess(bookingData) {
           ` : ''}
         </div>
         
-        <button class="success-close-btn" onclick="closeBookingModal()">Close</button>
+        <div class="success-actions">
+          <button class="btn primary" onclick="location.hash='#/rooms'; document.querySelector('.booking-success-modal').remove();">View My Bookings</button>
+          <button class="btn" onclick="closeBookingModal()">Close</button>
+        </div>
       </div>
     </div>
   `;
@@ -1008,6 +1127,62 @@ function showPolicy() {
   alert('Booking and Cancellation Policy:\n\n- Cancellations made 48 hours before check-in: Full refund\n- Cancellations made 24-48 hours before check-in: 50% refund\n- Cancellations made less than 24 hours before check-in: No refund\n- No-shows: No refund\n\nFor more details, please contact our reservations team.');
 }
 
+// Calendar integration functions
+function openCalendarForCheckin() {
+  // Store current booking modal state
+  window.bookingModalCalendarMode = 'checkin';
+  
+  // Only store actual date values, not empty strings
+  const checkinValue = document.getElementById('checkin-date')?.value;
+  const checkoutValue = document.getElementById('checkout-date')?.value;
+  
+  window.bookingModalCurrentDates = {
+    checkin: checkinValue && checkinValue.trim() !== '' ? checkinValue : null,
+    checkout: checkoutValue && checkoutValue.trim() !== '' ? checkoutValue : null
+  };
+  
+  // Open calendar modal for room booking
+  if (window.openCalendarModal) {
+    window.openCalendarModal('Room Booking', 15, 'rooms');
+  }
+}
+
+function openCalendarForCheckout() {
+  // Store current booking modal state
+  window.bookingModalCalendarMode = 'checkout';
+  
+  // Only store actual date values, not empty strings
+  const checkinValue = document.getElementById('checkin-date')?.value;
+  const checkoutValue = document.getElementById('checkout-date')?.value;
+  
+  window.bookingModalCurrentDates = {
+    checkin: checkinValue && checkinValue.trim() !== '' ? checkinValue : null,
+    checkout: checkoutValue && checkoutValue.trim() !== '' ? checkoutValue : null
+  };
+  
+  // Open calendar modal for room booking
+  if (window.openCalendarModal) {
+    window.openCalendarModal('Room Booking', 15, 'rooms');
+  }
+}
+
+function updateBookingDates(checkinDate, checkoutDate) {
+  const checkinInput = document.getElementById('checkin-date');
+  const checkoutInput = document.getElementById('checkout-date');
+  
+  if (checkinInput && checkinDate) {
+    checkinInput.value = checkinDate;
+  }
+  
+  if (checkoutInput && checkoutDate) {
+    checkoutInput.value = checkoutDate;
+  }
+  
+  // Trigger change events to update nights calculation
+  if (checkinInput) checkinInput.dispatchEvent(new Event('change'));
+  if (checkoutInput) checkoutInput.dispatchEvent(new Event('change'));
+}
+
 // Make functions globally available
 window.openBookingModal = openBookingModal;
 window.closeBookingModal = closeBookingModal;
@@ -1015,3 +1190,8 @@ window.changeReservationType = changeReservationType;
 window.toggleAddCottage = toggleAddCottage;
 window.submitBooking = submitBooking;
 window.showPolicy = showPolicy;
+
+// Calendar integration functions
+window.openCalendarForCheckin = openCalendarForCheckin;
+window.openCalendarForCheckout = openCalendarForCheckout;
+window.updateBookingDates = updateBookingDates;

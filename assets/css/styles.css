@@ -46,6 +46,15 @@ main {
     padding-top: 0; /* No padding for mobile */
   }
 }
+body {  
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+    Arial, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  font-size: clamp(14px, 1.8vw, 16px); /* fluid base font size */
+}
 
 /* Global Custom Scrollbar - Hidden until hover */
 * {
@@ -81,16 +90,6 @@ main {
 
 *::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.4);
-}
-
-body {  
-  margin: 0;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
-    Arial, sans-serif;
-  background: var(--color-bg);
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-  font-size: clamp(14px, 1.8vw, 16px); /* fluid base font size */
 }
 
 /* Global heading styles with intensified black */
@@ -4275,13 +4274,14 @@ body.modal-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 3000;
   opacity: 0;
   visibility: hidden;
   transition: all 0.3s ease;
   padding: 20px;
   /* Ensure overlay captures scroll events */
   overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .calendar-modal-overlay.show {
@@ -4303,14 +4303,14 @@ body.modal-open {
   transition: transform 0.3s ease;
   /* Enable smooth scrolling */
   scroll-behavior: smooth;
+  /* Glass effect scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  /* Prevent scroll chaining to background */
+  overscroll-behavior: contain;
 }
 
 /* Calendar Modal - Glass effect scrollbar */
-.calendar-modal {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
 .calendar-modal:hover {
   scrollbar-color: rgba(102, 126, 234, 0.3) rgba(0, 0, 0, 0.05);
 }
@@ -4553,6 +4553,57 @@ body.modal-open {
   background: #5a6268;
 }
 
+.calendar-undo-btn {
+  padding: 8px 16px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendar-undo-btn:hover {
+  background: #5a67d8;
+  transform: translateY(-1px);
+}
+
+.calendar-undo-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.calendar-confirm-btn {
+  padding: 8px 16px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendar-confirm-btn:hover {
+  background: #218838;
+  transform: translateY(-1px);
+}
+
+.calendar-confirm-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .calendar-legend {
   display: flex;
   justify-content: center;
@@ -4685,8 +4736,6 @@ body.modal-open {
   visibility: hidden;
   transition: all 0.3s ease;
   padding: 20px;
-  /* Ensure overlay captures scroll events */
-  overflow: hidden;
 }
 
 .booking-modal-overlay.show {
@@ -4705,14 +4754,12 @@ body.modal-open {
   box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
   transform: scale(0.9) translateY(20px);
   transition: all 0.3s ease;
-}
-
-/* Booking Modal - Glass effect scrollbar */
-.booking-modal {
+  /* Glass effect scrollbar */
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
+/* Booking Modal - Glass effect scrollbar */
 .booking-modal:hover {
   scrollbar-color: rgba(102, 126, 234, 0.3) rgba(0, 0, 0, 0.05);
 }
@@ -4740,6 +4787,41 @@ body.modal-open {
 
 .booking-modal::-webkit-scrollbar-thumb:hover {
   background: rgba(102, 126, 234, 0.4);
+}
+
+/* Calendar icon button styling */
+.calendar-icon-btn {
+  width: 40px;
+  height: 40px;
+  background: #f8f9fa;
+  border: 1px solid #e7efef;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  color: #667eea;
+}
+
+.calendar-icon-btn:hover {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Make readonly date inputs look clickable */
+input[type="date"][readonly] {
+  cursor: pointer;
+  background-color: #f8f9fa;
+}
+
+input[type="date"][readonly]:hover {
+  background-color: #e9ecef;
+  border-color: #667eea;
 }
 
 .booking-modal-overlay.show .booking-modal {
@@ -5235,5 +5317,231 @@ body.modal-open {
   
   .success-content h3 {
     font-size: 20px;
+  }
+}
+
+/* My Bookings Page Styles */
+.my-bookings-page {
+  padding: 40px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.bookings-header {
+  text-align: center;
+  margin-bottom: 40px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--border);
+}
+
+.bookings-header h2 {
+  margin: 0 0 8px 0;
+  color: var(--color-text);
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.user-welcome {
+  color: var(--color-text-secondary);
+  margin: 0 0 20px 0;
+  font-size: 1.1rem;
+}
+
+.bookings-controls {
+  margin-top: 20px;
+}
+
+.bookings-section {
+  margin-bottom: 40px;
+}
+
+.bookings-section h3 {
+  color: var(--color-text);
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+  font-weight: 600;
+  padding-left: 8px;
+  border-left: 4px solid var(--color-accent);
+}
+
+.bookings-table-wrapper {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  overflow-x: auto;
+}
+
+.bookings-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
+}
+
+.bookings-table th {
+  background: var(--color-accent);
+  color: white;
+  padding: 16px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bookings-table td {
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.bookings-table tr:hover {
+  background: var(--color-bg);
+}
+
+.booking-status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.booking-status-badge.confirmed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.booking-status-badge.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.booking-status-badge.cancelled {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.booking-status-badge.completed {
+  background: #cce5ff;
+  color: #004085;
+}
+
+.booking-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn.small {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border-radius: 6px;
+}
+
+.btn.danger {
+  background: #dc3545;
+  color: white;
+  border: none;
+}
+
+.btn.danger:hover {
+  background: #c82333;
+}
+
+.bookings-empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--color-text-secondary);
+}
+
+.bookings-empty-state svg {
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.bookings-empty-state p {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.empty-state {
+  text-align: center;
+}
+
+/* Booking Details Modal Styles */
+.booking-details-modal h3 {
+  margin-top: 0;
+  color: var(--color-text);
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.booking-details-content {
+  margin: 20px 0;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.modal-actions {
+  text-align: right;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid var(--border);
+}
+
+/* Success Modal Actions */
+.success-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* Mobile Responsive for My Bookings */
+@media (max-width: 768px) {
+  .my-bookings-page {
+    padding: 20px 10px;
+  }
+
+  .bookings-header h2 {
+    font-size: 2rem;
+  }
+
+  .bookings-table {
+    font-size: 0.9rem;
+  }
+
+  .bookings-table th,
+  .bookings-table td {
+    padding: 12px 8px;
+  }
+
+  .booking-actions {
+    flex-direction: column;
+  }
+
+  .btn.small {
+    width: 100%;
+    text-align: center;
+  }
+
+  .detail-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .success-actions {
+    flex-direction: column;
   }
 }

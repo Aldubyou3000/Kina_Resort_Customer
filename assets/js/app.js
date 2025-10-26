@@ -5,7 +5,7 @@ import { showToast } from './components/toast.js';
 import { setBusy } from './components/loader.js';
 import { HomePage } from './pages/home.js';
 import { PackagesPage, initLuxuryPackages } from './pages/packages.js';
-import { RoomsPage } from './pages/rooms.js';
+import { MyBookingsPage } from './pages/myBookings.js';
 import { AuthPage } from './pages/auth.js';
 import { RegisterPage } from './pages/register.js';
 import { ForgotPasswordPage } from './pages/forgotPassword.js';
@@ -29,7 +29,7 @@ let scrollAnimations = null;
 const routes = {
   '/': HomePage,
   '/packages': PackagesPage,
-  '/rooms': RoomsPage,
+  '/rooms': MyBookingsPage,
   '/auth': AuthPage,
   '/register': RegisterPage,
   '/forgot-password': ForgotPasswordPage,
@@ -137,6 +137,9 @@ async function router(){
 function onReady(){
   renderHeader();
   renderFooter();
+  
+  // Make auth state globally available
+  window.getAuthState = getAuthState;
   
   // Initialize smooth scrolling
   lenisInstance = initSmoothScroll();
